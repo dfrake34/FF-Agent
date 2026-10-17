@@ -34,11 +34,11 @@ class Lineup:
         return {
             "starters": [
                 {"slot": s, "player": p.name, "position": p.position, "team": p.team,
-                 "projected": p.projected, "injury_status": p.injury_status}
+                 "opponent": p.opponent, "projected": p.projected, "injury_status": p.injury_status}
                 for s, p in self.starters
             ],
-            "bench": [{"player": p.name, "position": p.position, "projected": p.projected,
-                       "injury_status": p.injury_status} for p in self.bench],
+            "bench": [{"player": p.name, "position": p.position, "opponent": p.opponent,
+                       "projected": p.projected, "injury_status": p.injury_status} for p in self.bench],
             "empty_slots": self.empty_slots,
             "projected_total": round(self.total, 2),
         }
@@ -94,9 +94,11 @@ def waiver_targets(team: Team, free_agents: list[Player], slots: list[str], limi
 
     For each free agent, the gain is the change in optimal lineup value from adding them, for
     this week and for the rest of the season. The suggested drop is the lowest rest-of-season
-    value player who would not start in the improved rest-of-season lineup.
+    value player who would not start in the improved rest-of-season lineup; players in IR or
+    taxi slots are never suggested, since dropping them doesn't open a roster spot.
     """
     roster = team.players()
+    stashed = {e.player.id for e in team.roster if e.slot in ("IR", "TAXI")}
     base_week = optimize_lineup(roster, slots).total
     base_ros = optimize_lineup(roster, slots, ros_value).total
     out = []
@@ -106,13 +108,14 @@ def waiver_targets(team: Team, free_agents: list[Player], slots: list[str], limi
         ros_gain = ros_lineup.total - base_ros
         if week_gain <= 0 and ros_gain <= 0:
             continue
-        droppable = [p for p in ros_lineup.bench if p.id != fa.id]
+        droppable = [p for p in ros_lineup.bench if p.id != fa.id and p.id not in stashed]
         drop = min(droppable, key=lambda p: (p.ros_projected, p.projected)) if droppable else None
         out.append(
             {
                 "player": fa.name,
                 "position": fa.position,
                 "team": fa.team,
+                "opponent": fa.opponent,
                 "injury_status": fa.injury_status,
                 "projected_this_week": fa.projected,
                 "ros_projected": fa.ros_projected,
@@ -191,7 +194,8 @@ def matchup_preview(my_team: Team, opponent: Team, slots: list[str]) -> dict:
         "win_probability": round(win_probability(my_starters, opp_starters), 3),
         "my_lineup": mine.to_dict()["starters"],
         "opponent_lineup": [
-            {"player": p.name, "position": p.position, "projected": p.projected, "injury_status": p.injury_status}
+            {"player": p.name, "position": p.position, "opponent": p.opponent, "projected": p.projected,
+             "injury_status": p.injury_status}
             for p in opp_starters
         ],
     }

@@ -29,6 +29,7 @@ class Player:
     name: str
     position: str
     team: str | None = None
+    opponent: str | None = None  # NFL opponent this week, or "BYE"
     injury_status: str | None = None
     projected: float = 0.0
     ros_projected: float = 0.0

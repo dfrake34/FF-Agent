@@ -31,12 +31,12 @@ def _print_text(command: str, data: dict) -> None:
         print(_table(data["standings"], ["rank", "name", "owner", "record", "points_for", "points_per_game", "luck"]))
     elif command in ("roster",):
         print(f"{data['name']} ({data['record']})\n")
-        print(_table(data["roster"], ["slot", "name", "position", "team", "projected", "ros_projected", "injury_status"]))
+        print(_table(data["roster"], ["slot", "name", "position", "team", "opponent", "projected", "ros_projected", "injury_status"]))
     elif command == "lineup":
         opt = data["optimal_lineup"]
         print(f"Week {data['week']} optimal lineup for {data['team']}: {opt['projected_total']} pts "
               f"(current {data['current_projected_total']}, gain {data['projected_gain']:+})\n")
-        print(_table(opt["starters"], ["slot", "player", "position", "team", "projected", "injury_status"]))
+        print(_table(opt["starters"], ["slot", "player", "position", "team", "opponent", "projected", "injury_status"]))
         if data["start"] or data["bench"]:
             print(f"\nStart: {', '.join(data['start']) or '-'}\nBench: {', '.join(data['bench']) or '-'}")
         if data["injured_starters"]:
@@ -48,11 +48,16 @@ def _print_text(command: str, data: dict) -> None:
         print(f"Week {data['week']}: {data['my_team']} {data['my_projected']} vs "
               f"{data['opponent']} {data['opponent_projected']} - win probability "
               f"{data['win_probability']:.0%}\n")
-        print(_table(data["my_lineup"], ["slot", "player", "position", "projected"]))
+        print(_table(data["my_lineup"], ["slot", "player", "position", "opponent", "projected"]))
         print()
-        print(_table(data["opponent_lineup"], ["player", "position", "projected", "injury_status"]))
+        print(_table(data["opponent_lineup"], ["player", "position", "opponent", "projected", "injury_status"]))
     elif command == "waivers":
-        print(_table(data["recommendations"], ["player", "position", "team", "projected_this_week",
+        if not data["recommendations"]:
+            print("No free agent improves your starting lineup. Best available:\n")
+            print(_table(data["best_available"], ["name", "position", "team", "opponent", "projected",
+                                                  "ros_projected", "injury_status"]))
+            return
+        print(_table(data["recommendations"], ["player", "position", "team", "opponent", "projected_this_week",
                                                "ros_projected", "weekly_lineup_gain", "ros_lineup_gain",
                                                "suggested_drop"]))
     elif command == "trade":

@@ -78,7 +78,7 @@ class SleeperClient:
         """Weekly projections, or full-season projections when `week` is None."""
         url = f"{PROJECTIONS_URL}/{season}" + (f"/{week}" if week else "")
         params = [("season_type", "regular")] + [("position[]", p) for p in FANTASY_POSITIONS]
-        return self.http.get(url, params=params, cache_ttl=60 * 60) or []
+        return self.http.get(url, params=params, cache_ttl=3 * 60 * 60) or []
 
 
 def score_stats(stats: dict, scoring_settings: dict) -> float:
@@ -116,6 +116,8 @@ class SleeperLeague(FantasyLeague):
         self.username = username
         self._teams_cache: dict[int, list[Team]] = {}
         self._proj_cache: dict[int | None, dict[str, float]] = {}
+        self._opp_cache: dict[int, dict[str, str | None]] = {}
+        self._playing_cache: dict[int, set[str]] = {}
 
     # Raw data ---------------------------------------------------------------
 
@@ -155,11 +157,34 @@ class SleeperLeague(FantasyLeague):
         """player_id -> projected fantasy points under this league's scoring (week=None: season)."""
         if week not in self._proj_cache:
             scoring = self._league.get("scoring_settings") or {}
+            raw = self.client.get_projections(self.season, week)
             self._proj_cache[week] = {
-                str(p["player_id"]): score_stats(p.get("stats") or {}, scoring)
-                for p in self.client.get_projections(self.season, week)
+                str(p["player_id"]): score_stats(p.get("stats") or {}, scoring) for p in raw
             }
+            if week is not None:
+                self._opp_cache[week] = {str(p["player_id"]): p.get("opponent") for p in raw}
+                self._playing_cache[week] = {p.get("team") for p in raw if p.get("opponent")}
         return self._proj_cache[week]
+
+    def opponent(self, player_id: str, nfl_team: str | None, week: int) -> str | None:
+        """The player's NFL opponent for `week`, or "BYE" when their team doesn't play."""
+        self.projections(week)
+        playing = self._playing_cache.get(week) or set()
+        if nfl_team and playing and nfl_team not in playing:
+            return "BYE"
+        return self._opp_cache.get(week, {}).get(player_id)
+
+    def ros_projection(self, player_id: str) -> float:
+        """Sum of weekly projections from the current week through the end of the fantasy season.
+
+        Falls back to pro-rating the full-season projection when future weeks aren't published.
+        """
+        weeks = range(self.current_week, self.league().total_weeks + 1)
+        weekly = [self.projections(w) for w in weeks]
+        if all(weekly):
+            return round(sum(w.get(player_id, 0.0) for w in weekly), 1)
+        season_proj = self.projections(None).get(player_id, 0.0)
+        return round(season_proj * len(weeks) / self.league().total_weeks, 1)
 
     def _player(self, player_id: str, week: int) -> Player:
         info = self._players.get(player_id, {})
@@ -167,16 +192,16 @@ class SleeperLeague(FantasyLeague):
             x for x in (info.get("first_name"), info.get("last_name")) if x
         )
         position = info.get("position") or (info.get("fantasy_positions") or ["?"])[0]
-        remaining = max(1, self.league().total_weeks - self.current_week + 1)
-        season_proj = self.projections(None).get(player_id, 0.0)
+        team = info.get("team") or (player_id if position == "DEF" else None)
         return Player(
             id=player_id,
             name=name or player_id,
             position=position,
-            team=info.get("team"),
-            injury_status=info.get("injury_status"),
+            team=team,
+            opponent=self.opponent(player_id, team, week),
+            injury_status=info.get("injury_status") or None,
             projected=self.projections(week).get(player_id, 0.0),
-            ros_projected=round(season_proj * remaining / self.league().total_weeks, 1),
+            ros_projected=self.ros_projection(player_id),
         )
 
     # FantasyLeague ----------------------------------------------------------

@@ -68,3 +68,11 @@ def test_standings_order_and_luck():
     rows = analysis.standings(teams)
     assert [r["name"] for r in rows] == ["Lucky", "Unlucky"]
     assert rows[0]["luck"] == 5 and rows[1]["luck"] == -5
+
+
+def test_waivers_never_suggest_dropping_ir_or_taxi_players():
+    roster = [RosterEntry(P("rb1", "RB", 12), "RB"), RosterEntry(P("ir", "RB", 0, ros=0), "IR"),
+              RosterEntry(P("taxi", "WR", 0, ros=1), "TAXI"), RosterEntry(P("bench", "WR", 2, ros=30), "BN")]
+    t = Team(id="1", name="T", owner="o", roster=roster)
+    [rec] = analysis.waiver_targets(t, [P("fa", "RB", 15)], ["RB", "BN"])
+    assert rec["suggested_drop"] == "bench"

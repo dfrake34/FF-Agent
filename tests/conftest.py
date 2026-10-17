@@ -20,6 +20,8 @@ class FakeHttp:
         for suffix in sorted(self.routes, key=len, reverse=True):
             if url.endswith(suffix):
                 return self.routes[suffix]
+        if "/projections/nfl/" in url:
+            return []  # weeks not in the fixture have no published projections
         raise AssertionError(f"unexpected request {url}")
 
 

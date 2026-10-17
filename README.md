@@ -57,6 +57,7 @@ ffagent/
 - **Projections:** Sleeper weekly and season projections are scored with your league's
   `scoring_settings`, so TE premium, 6-pt pass TDs and similar settings are reflected. ESPN
   projections come from ESPN's own per-league projected totals.
+- **Waivers** leave out kickers and defenses unless you ask for them with `--position K` or `--position DEF`.
 - **Lineups:** fills the most restrictive slots first, then FLEX and SUPER_FLEX, and skips
   players ruled Out, on IR or suspended.
 - **Waivers:** each free agent is scored by how much they raise your *optimal starting lineup*
@@ -78,8 +79,10 @@ as Sleeper asks.
 ## Notes and limits
 
 - ESPN's API and Sleeper's projections endpoint are undocumented and may change.
-- Rest-of-season values are season projections pro-rated by the weeks remaining, so they
-  don't account for bye weeks or playoff-week schedules.
+- On Sleeper, rest-of-season values add up Sleeper's weekly projections through week 17, so
+  bye weeks count as zero. If future weeks aren't published yet, and always on ESPN, they're
+  season projections scaled to the weeks remaining.
+- Opponents and bye weeks come from Sleeper's projections and are only shown for Sleeper leagues.
 - The tools only read your leagues. They don't set lineups or submit claims or trades.
 
 ## Tests

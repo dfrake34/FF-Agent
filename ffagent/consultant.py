@@ -170,7 +170,10 @@ class Consultant:
 
     def waivers(self, position: str | None = None, limit: int = 10) -> dict:
         lg = self.active
-        pool = lg.free_agents(position, limit=60)
+        pool = lg.free_agents(position, limit=300)
+        if position is None:
+            # Kickers and defenses are weekly streams; ask for them by position.
+            pool = [p for p in pool if p.position not in ("K", "DEF")]
         return {
             "position_filter": position,
             "recommendations": analysis.waiver_targets(lg.my_team(), pool, lg.league().roster_slots, limit),

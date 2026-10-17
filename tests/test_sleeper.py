@@ -39,3 +39,23 @@ def test_trending_flags_rostered(sleeper_league):
     trending = sleeper_league.trending()
     assert [(t["name"], t["rostered_in_league"]) for t in trending] == [
         ("Free Agent Back", False), ("Carl Runner", True)]
+
+
+def test_ros_sums_weekly_projections_and_detects_byes():
+    from conftest import SLEEPER_ROUTES, FakeHttp
+    from ffagent.sleeper import SleeperClient, SleeperLeague
+
+    routes = dict(SLEEPER_ROUTES)
+    for week in range(7, 18):
+        # Week 9 is SF's bye: no projection rows for SF players, everyone else plays.
+        routes[f"/projections/nfl/2026/{week}"] = [
+            {"player_id": "rb1", "team": "SF", "opponent": "SEA", "stats": {"rec": 5, "rec_yd": 50}},
+            {"player_id": "rb2", "team": "DET", "opponent": "GB", "stats": {"rec": 1, "rec_yd": 10}},
+        ][week == 9:]
+    league = SleeperLeague("L1", SleeperClient(FakeHttp(routes)), username="me")
+
+    carl = next(e.player for e in league.team("2").roster if e.player.name == "Carl Runner")
+    assert carl.projected == 10 and carl.opponent == "SEA"
+    assert carl.ros_projected == 100  # 10 points in each of weeks 7-17 except the week 9 bye
+    carl_wk9 = next(e.player for e in league.team("2", week=9).roster if e.player.name == "Carl Runner")
+    assert carl_wk9.opponent == "BYE" and carl_wk9.projected == 0
